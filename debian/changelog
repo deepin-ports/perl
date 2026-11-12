@@ -1,3 +1,11 @@
+perl (5.36.0-10deepin10) unstable; urgency=medium
+
+  * Add build dependency on libcrypt-dev (from Debian perl 5.38.0~rc2-1).
+  * Add libcrypt-dev to libperl-dev's Depends (from Debian perl 5.42.0-3).
+    libc6-dev no longer depends on libcrypt-dev since glibc 2.42-7.
+
+ -- purofle <purofle@gmail.com>  Thu, 12 Nov 2026 16:56:55 +0800
+
 perl (5.36.0-10deepin9) unstable; urgency=medium
 
   * Rebuild with LTO enabled (dpkg vendor feature optimize/lto).

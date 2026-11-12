@@ -16,6 +16,7 @@ Build-Depends: file,
  debhelper-compat (= 13),
  zlib1g-dev | libz-dev,
  libbz2-dev,
+ libcrypt-dev,
  dpkg-dev (>= 1.17.14),
  dist (>= 3.5-236),
  libc6-dev (>= 2.37-8) [ppc64el],
@@ -173,7 +174,7 @@ Architecture: any
 Provides: perl-xs-dev
 Multi-Arch: same
 Depends: perl:any (= ${binary:Version}), libperl5.36 (= ${binary:Version}),
- ${misc:Depends}, libc6-dev | libc-dev
+ ${misc:Depends}, libc6-dev | libc-dev, libcrypt-dev
 Description: Perl library: development files
  Files for developing applications which embed a Perl interpreter.
 
