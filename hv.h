@@ -112,6 +112,9 @@ union _xhvnameu {
     HEK **xhvnameu_names;	/* When xhv_name_count is non-0 */
 };
 
+/* A struct defined by pad.h and used within class.c */
+struct suspended_compcv;
+
 struct xpvhv_aux {
     union _xhvnameu xhv_name_u;	/* name, if a symbol table */
     AV		*xhv_backreferences; /* back references for weak references */
@@ -132,10 +135,25 @@ struct xpvhv_aux {
                                    used to detect each() after insert for warnings */
 #endif
     U32         xhv_aux_flags;      /* assorted extra flags */
+
+    /* The following fields are only valid if we have the flag HvAUXf_IS_CLASS */
+    HV          *xhv_class_superclass;         /* STASH of the :isa() base class */
+    CV          *xhv_class_initfields_cv;      /* CV for running initfields */
+    AV          *xhv_class_adjust_blocks;      /* CVs containing the ADJUST blocks */
+    PADNAMELIST *xhv_class_fields;             /* PADNAMEs with PadnameIsFIELD() */
+    PADOFFSET    xhv_class_next_fieldix;
+    HV          *xhv_class_param_map;          /* Maps param names to field index stored in UV */
+
+    struct suspended_compcv
+                *xhv_class_suspended_initfields_compcv;
 };
 
 #define HvAUXf_SCAN_STASH   0x1   /* stash is being scanned by gv_check */
 #define HvAUXf_NO_DEREF     0x2   /* @{}, %{} etc (and nomethod) not present */
+#define HvAUXf_IS_CLASS     0x4   /* the package is a 'class' */
+
+#define HvSTASH_IS_CLASS(hv) \
+    (HvHasAUX(hv) && HvAUX(hv)->xhv_aux_flags & HvAUXf_IS_CLASS)
 
 /* hash structure: */
 /* This structure must match the beginning of struct xpvmg in sv.h. */
@@ -153,6 +171,24 @@ struct xpvhv_with_aux {
     STRLEN      xhv_max;        /* subscript of last element of xhv_array */
     struct xpvhv_aux xhv_aux;
 };
+
+/*
+=for apidoc_section $HV
+
+=for apidoc      Am|HV *|HvREFCNT_inc|HV *hv
+=for apidoc_item   |HV *|HvREFCNT_inc_simple|HV *hv
+=for apidoc_item   |HV *|HvREFCNT_inc_simple_NN|HV *hv
+
+These all increment the reference count of the given SV, which must be a HV.
+They are useful when assigning the result into a typed pointer as they avoid
+the need to cast the result to the appropriate type.
+
+=cut
+*/
+
+#define HvREFCNT_inc(hv)            ((HV *)SvREFCNT_inc((SV *)hv))
+#define HvREFCNT_inc_simple(hv)     ((HV *)SvREFCNT_inc_simple((SV *)hv))
+#define HvREFCNT_inc_simple_NN(hv)  ((HV *)SvREFCNT_inc_simple_NN((SV *)hv))
 
 /*
 =for apidoc AmnU||HEf_SVKEY
@@ -280,19 +316,33 @@ hash.
 =cut
 
 */
+
 #define HvFILL(hv)	Perl_hv_fill(aTHX_ MUTABLE_HV(hv))
 #define HvMAX(hv)	((XPVHV*)  SvANY(hv))->xhv_max
+
+/*
+
+=for apidoc Am|bool|HvHasAUX|HV *const hv
+
+Returns true if the HV has a C<struct xpvhv_aux> extension. Use this to check
+whether it is valid to call C<HvAUX()>.
+
+=cut
+
+*/
+#define HvHasAUX(hv)	(SvFLAGS(hv) & SVphv_HasAUX)
+
 /* This quite intentionally does no flag checking first. That's your
-   responsibility.  */
+   responsibility. Use HvHasAUX() first */
 #define HvAUX(hv)       (&(((struct xpvhv_with_aux*)  SvANY(hv))->xhv_aux))
 #define HvRITER(hv)	(*Perl_hv_riter_p(aTHX_ MUTABLE_HV(hv)))
 #define HvEITER(hv)	(*Perl_hv_eiter_p(aTHX_ MUTABLE_HV(hv)))
 #define HvRITER_set(hv,r)	Perl_hv_riter_set(aTHX_ MUTABLE_HV(hv), r)
 #define HvEITER_set(hv,e)	Perl_hv_eiter_set(aTHX_ MUTABLE_HV(hv), e)
-#define HvRITER_get(hv)	(SvOOK(hv) ? HvAUX(hv)->xhv_riter : -1)
-#define HvEITER_get(hv)	(SvOOK(hv) ? HvAUX(hv)->xhv_eiter : NULL)
-#define HvRAND_get(hv)	(SvOOK(hv) ? HvAUX(hv)->xhv_rand : 0)
-#define HvLASTRAND_get(hv)	(SvOOK(hv) ? HvAUX(hv)->xhv_last_rand : 0)
+#define HvRITER_get(hv)	(HvHasAUX(hv) ? HvAUX(hv)->xhv_riter : -1)
+#define HvEITER_get(hv)	(HvHasAUX(hv) ? HvAUX(hv)->xhv_eiter : NULL)
+#define HvRAND_get(hv)	(HvHasAUX(hv) ? HvAUX(hv)->xhv_rand : 0)
+#define HvLASTRAND_get(hv)	(HvHasAUX(hv) ? HvAUX(hv)->xhv_last_rand : 0)
 
 #define HvNAME(hv)	HvNAME_get(hv)
 #define HvNAMELEN(hv)   HvNAMELEN_get(hv)
@@ -313,15 +363,16 @@ hash.
  )
 /* This macro may go away without notice.  */
 #define HvNAME_HEK(hv) \
-        (SvOOK(hv) && HvAUX(hv)->xhv_name_u.xhvnameu_name ? HvNAME_HEK_NN(hv) : NULL)
+        (HvHasAUX(hv) && HvAUX(hv)->xhv_name_u.xhvnameu_name ? HvNAME_HEK_NN(hv) : NULL)
+#define HvHasNAME(hv) \
+        (HvHasAUX(hv) && HvAUX(hv)->xhv_name_u.xhvnameu_name && HvNAME_HEK_NN(hv))
 #define HvNAME_get(hv) \
-        ((SvOOK(hv) && HvAUX(hv)->xhv_name_u.xhvnameu_name && HvNAME_HEK_NN(hv)) \
-                         ? HEK_KEY(HvNAME_HEK_NN(hv)) : NULL)
+        (HvHasNAME(hv) ? HEK_KEY(HvNAME_HEK_NN(hv)) : NULL)
 #define HvNAMELEN_get(hv) \
-        ((SvOOK(hv) && HvAUX(hv)->xhv_name_u.xhvnameu_name && HvNAME_HEK_NN(hv)) \
+        ((HvHasAUX(hv) && HvAUX(hv)->xhv_name_u.xhvnameu_name && HvNAME_HEK_NN(hv)) \
                                  ? HEK_LEN(HvNAME_HEK_NN(hv)) : 0)
 #define HvNAMEUTF8(hv) \
-        ((SvOOK(hv) && HvAUX(hv)->xhv_name_u.xhvnameu_name && HvNAME_HEK_NN(hv)) \
+        ((HvHasAUX(hv) && HvAUX(hv)->xhv_name_u.xhvnameu_name && HvNAME_HEK_NN(hv)) \
                                  ? HEK_UTF8(HvNAME_HEK_NN(hv)) : 0)
 #define HvENAME_HEK_NN(hv)                                             \
  (                                                                      \
@@ -330,17 +381,18 @@ hash.
   HvAUX(hv)->xhv_name_count == -1 ? NULL                              : \
                                     HvAUX(hv)->xhv_name_u.xhvnameu_name \
  )
+#define HvHasENAME_HEK(hv) \
+        (HvHasAUX(hv) && HvAUX(hv)->xhv_name_u.xhvnameu_name)
 #define HvENAME_HEK(hv) \
-        (SvOOK(hv) && HvAUX(hv)->xhv_name_u.xhvnameu_name ? HvENAME_HEK_NN(hv) : NULL)
+        (HvHasENAME_HEK(hv) ? HvENAME_HEK_NN(hv) : NULL)
+#define HvHasENAME(hv) \
+        (HvHasENAME_HEK(hv) && HvAUX(hv)->xhv_name_count != -1)
 #define HvENAME_get(hv) \
-   ((SvOOK(hv) && HvAUX(hv)->xhv_name_u.xhvnameu_name && HvAUX(hv)->xhv_name_count != -1) \
-                         ? HEK_KEY(HvENAME_HEK_NN(hv)) : NULL)
+        (HvHasENAME(hv) ? HEK_KEY(HvENAME_HEK_NN(hv)) : NULL)
 #define HvENAMELEN_get(hv) \
-   ((SvOOK(hv) && HvAUX(hv)->xhv_name_u.xhvnameu_name && HvAUX(hv)->xhv_name_count != -1) \
-                                 ? HEK_LEN(HvENAME_HEK_NN(hv)) : 0)
+        (HvHasENAME(hv) ? HEK_LEN(HvENAME_HEK_NN(hv)) : 0)
 #define HvENAMEUTF8(hv) \
-   ((SvOOK(hv) && HvAUX(hv)->xhv_name_u.xhvnameu_name && HvAUX(hv)->xhv_name_count != -1) \
-                                 ? HEK_UTF8(HvENAME_HEK_NN(hv)) : 0)
+        (HvHasENAME(hv) ? HEK_UTF8(HvENAME_HEK_NN(hv)) : 0)
 
 /*
  * HvKEYS gets the number of keys that actually exist(), and is provided
@@ -514,10 +566,21 @@ hash.
 
 /* Provide 's' suffix subs for constant strings (and avoid needing to count
  * chars). See STR_WITH_LEN in handy.h - because these are macros we cant use
- * STR_WITH_LEN to do the work, we have to unroll it. */
+ * STR_WITH_LEN to do the work, we have to unroll it.
+ *
+ *
+=for apidoc_defn AmR|bool|hv_existss|HV *hv|"key"
+=cut
+*/
 #define hv_existss(hv, key) \
     hv_exists((hv), ASSERT_IS_LITERAL(key), (sizeof(key)-1))
 
+/*
+=for apidoc_defn Am|SV**|hv_fetchs|HV* hv|"key"|I32 lval
+=for apidoc_defn Am|SV *|hv_deletes|HV *hv|"key"|U32 flags
+=for apidoc_defn Am|void|hv_name_sets|HV *hv|"name"|U32 flags
+=cut
+*/
 #define hv_fetchs(hv, key, lval) \
     hv_fetch((hv), ASSERT_IS_LITERAL(key), (sizeof(key)-1), (lval))
 

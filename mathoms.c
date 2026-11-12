@@ -22,15 +22,15 @@
 /*
  * This file contains mathoms, various binary artifacts from previous
  * versions of Perl which we cannot completely remove from the core
- * code. There are two reasons functions should be here:
+ * code. There is only one reason these days for functions should be here:
  *
  * 1) A function has been replaced by a macro within a minor release,
  *    so XS modules compiled against an older release will expect to
  *    still be able to link against the function
- * 2) A function Perl_foo(...) with #define foo Perl_foo(aTHX_ ...)
- *    has been replaced by a macro, e.g. #define foo(...) foo_flags(...,0)
- *    but XS code may still explicitly use the long form, i.e.
- *    Perl_foo(aTHX_ ...)
+ *
+ * It used to be that this was the way to handle the case were a function
+ * Perl_foo(...) had been replaced by a macro.  But see the 'm' flag discussion
+ * in embed.fnc for a better way to handle this.
  *
  * This file can't just be cleaned out periodically, because that would break
  * builds with -DPERL_NO_SHORT_NAMES
@@ -49,18 +49,13 @@
  *
  * and add the 'b' flag in embed.fnc.
  *
- * The compilation of this file can be suppressed; see INSTALL
+ * The compilation of this file and the functions within it can be suppressed
+ * by adding this option to Configure:
  *
- * Some blurb for perlapi.pod:
-
- head1 Obsolete backwards compatibility functions
-
-Some of these are also deprecated.  You can exclude these from
-your compiled Perl by adding this option to Configure:
-C<-Accflags='-DNO_MATHOMS'>
-
-=cut
-
+ *      -Accflags='-DNO_MATHOMS'
+ *
+ * Some of the functions here are also deprecated.
+ *
  */
 
 
@@ -86,18 +81,6 @@ Perl_ref(pTHX_ OP *o, I32 type)
 {
     return doref(o, type, TRUE);
 }
-
-/*
-=for apidoc_section $SV
-=for apidoc sv_unref
-
-Unsets the RV status of the SV, and decrements the reference count of
-whatever was being referenced by the RV.  This can almost be thought of
-as a reversal of C<newSVrv>.  This is C<sv_unref_flags> with the C<flag>
-being zero.  See C<L</SvROK_off>>.
-
-=cut
-*/
 
 void
 Perl_sv_unref(pTHX_ SV *sv)
@@ -228,17 +211,6 @@ Perl_sv_2pvutf8_nolen(pTHX_ SV *sv)
     return sv_2pvutf8(sv, NULL);
 }
 
-/*
-=for apidoc_section $SV
-=for apidoc sv_force_normal
-
-Undo various types of fakery on an SV: if the PV is a shared string, make
-a private copy; if we're a ref, stop refing; if we're a glob, downgrade to
-an C<xpvmg>.  See also C<L</sv_force_normal_flags>>.
-
-=cut
-*/
-
 void
 Perl_sv_force_normal(pTHX_ SV *sv)
 {
@@ -284,7 +256,7 @@ Perl_sv_catpvn_mg(pTHX_ SV *dsv, const char *sstr, STRLEN len)
  */
 
 void
-Perl_sv_catsv(pTHX_ SV *dsv, SV *sstr)
+Perl_sv_catsv(pTHX_ SV *dsv, SV * const sstr)
 {
     PERL_ARGS_ASSERT_SV_CATSV;
 
@@ -292,7 +264,7 @@ Perl_sv_catsv(pTHX_ SV *dsv, SV *sstr)
 }
 
 void
-Perl_sv_catsv_mg(pTHX_ SV *dsv, SV *sstr)
+Perl_sv_catsv_mg(pTHX_ SV *dsv, SV * const sstr)
 {
     PERL_ARGS_ASSERT_SV_CATSV_MG;
 
@@ -301,109 +273,12 @@ Perl_sv_catsv_mg(pTHX_ SV *dsv, SV *sstr)
 
 /*
 =for apidoc_section $SV
-=for apidoc sv_iv
-
-A private implementation of the C<SvIVx> macro for compilers which can't
-cope with complex macro expressions.  Always use the macro instead.
-
-=cut
-*/
-
-IV
-Perl_sv_iv(pTHX_ SV *sv)
-{
-    PERL_ARGS_ASSERT_SV_IV;
-
-    if (SvIOK(sv)) {
-        if (SvIsUV(sv))
-            return (IV)SvUVX(sv);
-        return SvIVX(sv);
-    }
-    return sv_2iv(sv);
-}
-
-/*
-=for apidoc_section $SV
-=for apidoc sv_uv
-
-A private implementation of the C<SvUVx> macro for compilers which can't
-cope with complex macro expressions.  Always use the macro instead.
-
-=cut
-*/
-
-UV
-Perl_sv_uv(pTHX_ SV *sv)
-{
-    PERL_ARGS_ASSERT_SV_UV;
-
-    if (SvIOK(sv)) {
-        if (SvIsUV(sv))
-            return SvUVX(sv);
-        return (UV)SvIVX(sv);
-    }
-    return sv_2uv(sv);
-}
-
-/*
-=for apidoc_section $SV
-=for apidoc sv_nv
-
-A private implementation of the C<SvNVx> macro for compilers which can't
-cope with complex macro expressions.  Always use the macro instead.
-
-=cut
-*/
-
-NV
-Perl_sv_nv(pTHX_ SV *sv)
-{
-    PERL_ARGS_ASSERT_SV_NV;
-
-    if (SvNOK(sv))
-        return SvNVX(sv);
-    return sv_2nv(sv);
-}
-
-/*
-=for apidoc_section $SV
 =for apidoc sv_pv
 
 Use the C<SvPV_nolen> macro instead
 
-=for apidoc_section $SV
-=for apidoc sv_pvn
-
-A private implementation of the C<SvPV> macro for compilers which can't
-cope with complex macro expressions.  Always use the macro instead.
-
 =cut
 */
-
-char *
-Perl_sv_pvn(pTHX_ SV *sv, STRLEN *lp)
-{
-    PERL_ARGS_ASSERT_SV_PVN;
-
-    if (SvPOK(sv)) {
-        *lp = SvCUR(sv);
-        return SvPVX(sv);
-    }
-    return sv_2pv(sv, lp);
-}
-
-
-char *
-Perl_sv_pvn_nomg(pTHX_ SV *sv, STRLEN *lp)
-{
-    PERL_ARGS_ASSERT_SV_PVN_NOMG;
-
-    if (SvPOK(sv)) {
-        *lp = SvCUR(sv);
-        return SvPVX(sv);
-    }
-    return sv_2pv_flags(sv, lp, 0);
-}
 
 /* sv_pv() is now a macro using SvPV_nolen();
  * this function provided for binary compatibility only
@@ -441,7 +316,7 @@ Perl_sv_pvbyte(pTHX_ SV *sv)
 {
     PERL_ARGS_ASSERT_SV_PVBYTE;
 
-    sv_utf8_downgrade(sv, FALSE);
+    (void)sv_utf8_downgrade(sv, FALSE);
     return sv_pv(sv);
 }
 
@@ -451,27 +326,18 @@ Perl_sv_pvbyte(pTHX_ SV *sv)
 
 Use C<SvPVbyte_nolen> instead.
 
-=for apidoc sv_pvbyten
+=cut
+*/
 
-A private implementation of the C<SvPVbyte> macro for compilers
-which can't cope with complex macro expressions.  Always use the macro
-instead.
+/*
+=for apidoc_section $SV
+=for apidoc sv_pvutf8
+
+Use the C<SvPVutf8_nolen> macro instead
 
 =cut
 */
 
-char *
-Perl_sv_pvbyten(pTHX_ SV *sv, STRLEN *lp)
-{
-    PERL_ARGS_ASSERT_SV_PVBYTEN;
-
-    sv_utf8_downgrade(sv, FALSE);
-    return sv_pvn(sv,lp);
-}
-
-/* sv_pvutf8 () is now a macro using Perl_sv_2pv_flags();
- * this function provided for binary compatibility only
- */
 
 char *
 Perl_sv_pvutf8(pTHX_ SV *sv)
@@ -480,30 +346,6 @@ Perl_sv_pvutf8(pTHX_ SV *sv)
 
     sv_utf8_upgrade(sv);
     return sv_pv(sv);
-}
-
-/*
-=for apidoc_section $SV
-=for apidoc sv_pvutf8
-
-Use the C<SvPVutf8_nolen> macro instead
-
-=for apidoc sv_pvutf8n
-
-A private implementation of the C<SvPVutf8> macro for compilers
-which can't cope with complex macro expressions.  Always use the macro
-instead.
-
-=cut
-*/
-
-char *
-Perl_sv_pvutf8n(pTHX_ SV *sv, STRLEN *lp)
-{
-    PERL_ARGS_ASSERT_SV_PVUTF8N;
-
-    sv_utf8_upgrade(sv);
-    return sv_pvn(sv,lp);
 }
 
 /* sv_utf8_upgrade() is now a macro using sv_utf8_upgrade_flags();
@@ -516,41 +358,6 @@ Perl_sv_utf8_upgrade(pTHX_ SV *sv)
     PERL_ARGS_ASSERT_SV_UTF8_UPGRADE;
 
     return sv_utf8_upgrade_flags(sv, SV_GMAGIC);
-}
-
-int
-Perl_fprintf_nocontext(PerlIO *stream, const char *format, ...)
-{
-    int ret = 0;
-    va_list arglist;
-
-    /* Easier to special case this here than in embed.pl. (Look at what it
-       generates for proto.h) */
-#ifdef MULTIPLICITY
-    PERL_ARGS_ASSERT_FPRINTF_NOCONTEXT;
-#endif
-
-    va_start(arglist, format);
-    ret = PerlIO_vprintf(stream, format, arglist);
-    va_end(arglist);
-    return ret;
-}
-
-int
-Perl_printf_nocontext(const char *format, ...)
-{
-    dTHX;
-    va_list arglist;
-    int ret = 0;
-
-#ifdef MULTIPLICITY
-    PERL_ARGS_ASSERT_PRINTF_NOCONTEXT;
-#endif
-
-    va_start(arglist, format);
-    ret = PerlIO_vprintf(PerlIO_stdout(), format, arglist);
-    va_end(arglist);
-    return ret;
 }
 
 #if defined(HUGE_VAL) || (defined(USE_LONG_DOUBLE) && defined(HUGE_VALL))
@@ -570,24 +377,6 @@ Perl_huge(void)
 }
 #endif
 
-/* compatibility with versions <= 5.003. */
-void
-Perl_gv_fullname(pTHX_ SV *sv, const GV *gv)
-{
-    PERL_ARGS_ASSERT_GV_FULLNAME;
-
-    gv_fullname3(sv, gv, sv == (const SV*)gv ? "*" : "");
-}
-
-/* compatibility with versions <= 5.003. */
-void
-Perl_gv_efullname(pTHX_ SV *sv, const GV *gv)
-{
-    PERL_ARGS_ASSERT_GV_EFULLNAME;
-
-    gv_efullname3(sv, gv, sv == (const SV*)gv ? "*" : "");
-}
-
 void
 Perl_gv_fullname3(pTHX_ SV *sv, const GV *gv, const char *prefix)
 {
@@ -603,15 +392,6 @@ Perl_gv_efullname3(pTHX_ SV *sv, const GV *gv, const char *prefix)
 
     gv_efullname4(sv, gv, prefix, TRUE);
 }
-
-/*
-=for apidoc_section $GV
-=for apidoc gv_fetchmethod
-
-See L</gv_fetchmethod_autoload>.
-
-=cut
-*/
 
 GV *
 Perl_gv_fetchmethod(pTHX_ HV *stash, const char *name)
@@ -647,36 +427,6 @@ Perl_do_open(pTHX_ GV *gv, const char *name, I32 len, int as_raw,
                     supplied_fp, (SV **) NULL, 0);
 }
 
-bool
-Perl_do_open9(pTHX_ GV *gv, const char *name, I32 len, int
-as_raw,
-              int rawmode, int rawperm, PerlIO *supplied_fp, SV *svs,
-              I32 num_svs)
-{
-    PERL_ARGS_ASSERT_DO_OPEN9;
-
-    PERL_UNUSED_ARG(num_svs);
-    return do_openn(gv, name, len, as_raw, rawmode, rawperm,
-                    supplied_fp, &svs, 1);
-}
-
-int
-Perl_do_binmode(pTHX_ PerlIO *fp, int iotype, int mode)
-{
- /* The old body of this is now in non-LAYER part of perlio.c
-  * This is a stub for any XS code which might have been calling it.
-  */
- const char *name = ":raw";
-
- PERL_ARGS_ASSERT_DO_BINMODE;
-
-#ifdef PERLIO_USING_CRLF
- if (!(mode & O_BINARY))
-     name = ":crlf";
-#endif
- return PerlIO_binmode(aTHX_ fp, iotype, mode, name);
-}
-
 #ifndef OS2
 bool
 Perl_do_aexec(pTHX_ SV *really, SV **mark, SV **sp)
@@ -686,21 +436,6 @@ Perl_do_aexec(pTHX_ SV *really, SV **mark, SV **sp)
     return do_aexec5(really, mark, sp, 0, 0);
 }
 #endif
-
-/* Backwards compatibility. */
-int
-Perl_init_i18nl14n(pTHX_ int printwarn)
-{
-    return init_i18nl10n(printwarn);
-}
-
-bool
-Perl_is_utf8_string_loc(const U8 *s, const STRLEN len, const U8 **ep)
-{
-    PERL_ARGS_ASSERT_IS_UTF8_STRING_LOC;
-
-    return is_utf8_string_loclen(s, len, ep, 0);
-}
 
 /*
 =for apidoc_section $SV
@@ -748,46 +483,6 @@ Perl_sv_nounlocking(pTHX_ SV *sv)
 }
 
 void
-Perl_save_long(pTHX_ long int *longp)
-{
-    PERL_ARGS_ASSERT_SAVE_LONG;
-
-    SSCHECK(3);
-    SSPUSHLONG(*longp);
-    SSPUSHPTR(longp);
-    SSPUSHUV(SAVEt_LONG);
-}
-
-void
-Perl_save_nogv(pTHX_ GV *gv)
-{
-    PERL_ARGS_ASSERT_SAVE_NOGV;
-
-    SSCHECK(2);
-    SSPUSHPTR(gv);
-    SSPUSHUV(SAVEt_NSTAB);
-}
-
-void
-Perl_save_list(pTHX_ SV **sarg, I32 maxsarg)
-{
-    I32 i;
-
-    PERL_ARGS_ASSERT_SAVE_LIST;
-
-    for (i = 1; i <= maxsarg; i++) {
-        SV *sv;
-        SvGETMAGIC(sarg[i]);
-        sv = newSV(0);
-        sv_setsv_nomg(sv,sarg[i]);
-        SSCHECK(3);
-        SSPUSHPTR(sarg[i]);		/* remember the pointer */
-        SSPUSHPTR(sv);			/* remember the value */
-        SSPUSHUV(SAVEt_ITEM);
-    }
-}
-
-void
 Perl_sv_usepvn_mg(pTHX_ SV *sv, char *ptr, STRLEN len)
 {
     PERL_ARGS_ASSERT_SV_USEPVN_MG;
@@ -802,52 +497,6 @@ Perl_sv_usepvn(pTHX_ SV *sv, char *ptr, STRLEN len)
     PERL_ARGS_ASSERT_SV_USEPVN;
 
     sv_usepvn_flags(sv,ptr,len, 0);
-}
-
-/*
-=for apidoc_section $pack
-=for apidoc unpack_str
-
-The engine implementing C<unpack()> Perl function.  Note: parameters C<strbeg>,
-C<new_s> and C<ocnt> are not used.  This call should not be used, use
-C<unpackstring> instead.
-
-=cut */
-
-SSize_t
-Perl_unpack_str(pTHX_ const char *pat, const char *patend, const char *s,
-                const char *strbeg, const char *strend, char **new_s, I32 ocnt,
-                U32 flags)
-{
-    PERL_ARGS_ASSERT_UNPACK_STR;
-
-    PERL_UNUSED_ARG(strbeg);
-    PERL_UNUSED_ARG(new_s);
-    PERL_UNUSED_ARG(ocnt);
-
-    return unpackstring(pat, patend, s, strend, flags);
-}
-
-/*
-=for apidoc_section $pack
-=for apidoc pack_cat
-
-The engine implementing C<pack()> Perl function.  Note: parameters
-C<next_in_list> and C<flags> are not used.  This call should not be used; use
-C<L</packlist>> instead.
-
-=cut
-*/
-
-void
-Perl_pack_cat(pTHX_ SV *cat, const char *pat, const char *patend, SV **beglist, SV **endlist, SV ***next_in_list, U32 flags)
-{
-    PERL_ARGS_ASSERT_PACK_CAT;
-
-    PERL_UNUSED_ARG(next_in_list);
-    PERL_UNUSED_ARG(flags);
-
-    packlist(cat, pat, patend, beglist, endlist);
 }
 
 HE *
@@ -1081,17 +730,6 @@ Perl_sv_collxfrm(pTHX_ SV *const sv, STRLEN *const nxp)
     return sv_collxfrm_flags(sv, nxp, SV_GMAGIC);
 }
 
-char *
-Perl_mem_collxfrm(pTHX_ const char *input_string, STRLEN len, STRLEN *xlen)
-{
-    /* This function is retained for compatibility in case someone outside core
-     * is using this (but it is undocumented) */
-
-    PERL_ARGS_ASSERT_MEM_COLLXFRM;
-
-    return _mem_collxfrm(input_string, len, xlen, FALSE);
-}
-
 #endif
 
 bool
@@ -1099,36 +737,6 @@ Perl_sv_2bool(pTHX_ SV *const sv)
 {
     PERL_ARGS_ASSERT_SV_2BOOL;
     return sv_2bool_flags(sv, SV_GMAGIC);
-}
-
-
-/*
-=for apidoc_section $custom
-=for apidoc custom_op_name
-Return the name for a given custom op.  This was once used by the C<OP_NAME>
-macro, but is no longer: it has only been kept for compatibility, and
-should not be used.
-
-=for apidoc custom_op_desc
-Return the description of a given custom op.  This was once used by the
-C<OP_DESC> macro, but is no longer: it has only been kept for
-compatibility, and should not be used.
-
-=cut
-*/
-
-const char*
-Perl_custom_op_name(pTHX_ const OP* o)
-{
-    PERL_ARGS_ASSERT_CUSTOM_OP_NAME;
-    return XopENTRYCUSTOM(o, xop_name);
-}
-
-const char*
-Perl_custom_op_desc(pTHX_ const OP* o)
-{
-    PERL_ARGS_ASSERT_CUSTOM_OP_DESC;
-    return XopENTRYCUSTOM(o, xop_desc);
 }
 
 CV *
@@ -1151,54 +759,6 @@ Perl_sv_copypv(pTHX_ SV *const dsv, SV *const ssv)
     sv_copypv_flags(dsv, ssv, SV_GMAGIC);
 }
 
-UV      /* Made into a function, so can be deprecated */
-NATIVE_TO_NEED(const UV enc, const UV ch)
-{
-    PERL_UNUSED_ARG(enc);
-    return ch;
-}
-
-UV      /* Made into a function, so can be deprecated */
-ASCII_TO_NEED(const UV enc, const UV ch)
-{
-    PERL_UNUSED_ARG(enc);
-    return ch;
-}
-
-/*
-=for apidoc_section $unicode
-=for apidoc is_utf8_char
-
-Tests if some arbitrary number of bytes begins in a valid UTF-8
-character.  Note that an INVARIANT (i.e. ASCII on non-EBCDIC machines)
-character is a valid UTF-8 character.  The actual number of bytes in the UTF-8
-character will be returned if it is valid, otherwise 0.
-
-This function is deprecated due to the possibility that malformed input could
-cause reading beyond the end of the input buffer.  Use L</isUTF8_CHAR>
-instead.
-
-=cut */
-
-STRLEN
-Perl_is_utf8_char(const U8 *s)
-{
-    PERL_ARGS_ASSERT_IS_UTF8_CHAR;
-
-    /* Assumes we have enough space, which is why this is deprecated.  But the
-     * UTF8_CHK_SKIP(s)) makes it safe for the common case of NUL-terminated
-     * strings */
-    return isUTF8_CHAR(s, s + UTF8_CHK_SKIP(s));
-}
-
-/*
-=for apidoc_section $unicode
-=for apidoc is_utf8_char_buf
-
-This is identical to the macro L<perlapi/isUTF8_CHAR>.
-
-=cut */
-
 STRLEN
 Perl_is_utf8_char_buf(const U8 *buf, const U8* buf_end)
 {
@@ -1206,20 +766,6 @@ Perl_is_utf8_char_buf(const U8 *buf, const U8* buf_end)
     PERL_ARGS_ASSERT_IS_UTF8_CHAR_BUF;
 
     return isUTF8_CHAR(buf, buf_end);
-}
-
-/* DEPRECATED!
- * Like L</utf8_to_uvuni_buf>(), but should only be called when it is known that
- * there are no malformations in the input UTF-8 string C<s>.  Surrogates,
- * non-character code points, and non-Unicode code points are allowed */
-
-UV
-Perl_valid_utf8_to_uvuni(pTHX_ const U8 *s, STRLEN *retlen)
-{
-    PERL_UNUSED_CONTEXT;
-    PERL_ARGS_ASSERT_VALID_UTF8_TO_UVUNI;
-
-    return NATIVE_TO_UNI(valid_utf8_to_uvchr(s, retlen));
 }
 
 /*
@@ -1234,7 +780,7 @@ Some, but not all, UTF-8 malformations are detected, and in fact, some
 malformed input could cause reading beyond the end of the input buffer, which
 is one reason why this function is deprecated.  The other is that only in
 extremely limited circumstances should the Unicode versus native code point be
-of any interest to you.  See L</utf8_to_uvuni_buf> for alternatives.
+of any interest to you.
 
 If C<s> points to one of the detected malformations, and UTF8 warnings are
 enabled, zero is returned and C<*retlen> is set (if C<retlen> doesn't point to
@@ -1254,36 +800,6 @@ Perl_utf8_to_uvuni(pTHX_ const U8 *s, STRLEN *retlen)
     PERL_ARGS_ASSERT_UTF8_TO_UVUNI;
 
     return NATIVE_TO_UNI(valid_utf8_to_uvchr(s, retlen));
-}
-
-/*
-=for apidoc_section $pad
-=for apidoc pad_compname_type
-
-Looks up the type of the lexical variable at position C<po> in the
-currently-compiling pad.  If the variable is typed, the stash of the
-class to which it is typed is returned.  If not, C<NULL> is returned.
-
-Use L<perlintern/C<PAD_COMPNAME_TYPE>> instead.
-
-=cut
-*/
-
-HV *
-Perl_pad_compname_type(pTHX_ const PADOFFSET po)
-{
-    return PAD_COMPNAME_TYPE(po);
-}
-
-/* return ptr to little string in big string, NULL if not found */
-/* The original version of this routine was donated by Corey Satten. */
-
-char *
-Perl_instr(const char *big, const char *little)
-{
-    PERL_ARGS_ASSERT_INSTR;
-
-    return instr(big, little);
 }
 
 SV *
@@ -1328,15 +844,15 @@ Perl_uvuni_to_utf8(pTHX_ U8 *d, UV uv)
 =for apidoc_section $unicode
 =for apidoc utf8n_to_uvuni
 
-Instead use L<perlapi/utf8_to_uvchr_buf>, or rarely, L<perlapi/utf8n_to_uvchr>.
+Instead use L<perlapi/utf8_to_uv>, or rarely, L<perlapi/utf8_to_uv_flags>.
 
 This function was useful for code that wanted to handle both EBCDIC and
 ASCII platforms with Unicode properties, but starting in Perl v5.20, the
 distinctions between the platforms have mostly been made invisible to most
 code, so this function is quite unlikely to be what you want.  If you do need
-this precise functionality, use instead
-C<L<NATIVE_TO_UNI(utf8_to_uvchr_buf(...))|perlapi/utf8_to_uvchr_buf>>
-or C<L<NATIVE_TO_UNI(utf8n_to_uvchr(...))|perlapi/utf8n_to_uvchr>>.
+this precise functionality, use instead L<perlapi/C<utf8_to_uv>> or
+L<perlapi/C<utf8_to_uv_flags>> to calculate the native code point, and then
+convert to Unicode using L<perlapi/C<NATIVE_TO_UNI>>.
 
 =cut
 */
@@ -1348,54 +864,6 @@ Perl_utf8n_to_uvuni(pTHX_ const U8 *s, STRLEN curlen, STRLEN *retlen, U32 flags)
 
     return NATIVE_TO_UNI(utf8n_to_uvchr(s, curlen, retlen, flags));
 }
-
-/*
-=for apidoc_section $unicode
-=for apidoc uvuni_to_utf8_flags
-
-Instead you almost certainly want to use L<perlapi/uvchr_to_utf8> or
-L<perlapi/uvchr_to_utf8_flags>.
-
-This function is a deprecated synonym for L</uvoffuni_to_utf8_flags>,
-which itself, while not deprecated, should be used only in isolated
-circumstances.  These functions were useful for code that wanted to handle
-both EBCDIC and ASCII platforms with Unicode properties, but starting in Perl
-v5.20, the distinctions between the platforms have mostly been made invisible
-to most code, so this function is quite unlikely to be what you want.
-
-=cut
-*/
-
-U8 *
-Perl_uvuni_to_utf8_flags(pTHX_ U8 *d, UV uv, UV flags)
-{
-    PERL_ARGS_ASSERT_UVUNI_TO_UTF8_FLAGS;
-
-    return uvoffuni_to_utf8_flags(d, uv, flags);
-}
-
-/*
-=for apidoc_section $unicode
-=for apidoc utf8_to_uvchr
-
-Returns the native code point of the first character in the string C<s>
-which is assumed to be in UTF-8 encoding; C<retlen> will be set to the
-length, in bytes, of that character.
-
-Some, but not all, UTF-8 malformations are detected, and in fact, some
-malformed input could cause reading beyond the end of the input buffer, which
-is why this function is deprecated.  Use L</utf8_to_uvchr_buf> instead.
-
-If C<s> points to one of the detected malformations, and UTF8 warnings are
-enabled, zero is returned and C<*retlen> is set (if C<retlen> isn't
-C<NULL>) to -1.  If those warnings are off, the computed value if well-defined (or
-the Unicode REPLACEMENT CHARACTER, if not) is silently returned, and C<*retlen>
-is set (if C<retlen> isn't NULL) so that (S<C<s> + C<*retlen>>) is the
-next possible position in C<s> that could begin a non-malformed character.
-See L</utf8n_to_uvchr> for details on when the REPLACEMENT CHARACTER is returned.
-
-=cut
-*/
 
 UV
 Perl_utf8_to_uvchr(pTHX_ const U8 *s, STRLEN *retlen)

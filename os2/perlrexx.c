@@ -74,6 +74,7 @@ init_perl(int doparse)
         if (!my_perl)
             return 0;
         perl_construct(my_perl);
+        PL_exit_flags |= PERL_EXIT_DESTRUCT_END;
         PL_perl_destruct_level = 1;
     }
     if (!doparse)
@@ -134,7 +135,7 @@ ULONG PERL (PCSZ name, LONG rargc, const RXSTRING *rargv,
         ret = 1;
     else {
         ret = 0;
-        sprintf(retstr->strptr, "%s", "ok");
+        strcpy(retstr->strptr, "ok");
         retstr->strlength = strlen (retstr->strptr);
     }
     PERL_SYS_TERM1(0);
@@ -161,7 +162,7 @@ ULONG PERLTERM (PCSZ name, LONG rargc, const RXSTRING *rargv,
     perl_free(my_perl);
     my_perl = 0;
 
-    sprintf(retstr->strptr, "%s", "ok");
+    strcpy(retstr->strptr, "ok");
     retstr->strlength = strlen (retstr->strptr);
     return 0;
 }
@@ -175,7 +176,7 @@ ULONG PERLINIT (PCSZ name, LONG rargc, const RXSTRING *rargv,
     if (!init_perl(1))
         return 1;
 
-    sprintf(retstr->strptr, "%s", "ok");
+    strcpy(retstr->strptr, "ok");
     retstr->strlength = strlen (retstr->strptr);
     return 0;
 }

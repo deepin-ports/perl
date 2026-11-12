@@ -64,6 +64,14 @@ typedef PERL_BITFIELD16 Optype;
     U8		op_private;
 #endif
 
+#define OpTYPE_set(o,type)                      \
+    STMT_START {                                \
+        OP *o_ = (OP *)o;                       \
+        OPCODE type_ = type;                    \
+        o_->op_type = type_;                    \
+        o_->op_ppaddr = PL_ppaddr[type_];       \
+    } STMT_END
+
 /* If op_type:9 is changed to :10, also change cx_pusheval()
    Also, if the type of op_type is ever changed (e.g. to PERL_BITFIELD32)
    then all the other bit-fields before/after it should change their
@@ -153,6 +161,9 @@ Deprecated.  Use C<GIMME_V> instead.
                                 /*  On OP_DUMP, has no label */
                                 /*  On OP_UNSTACK, in a C-style for loop */
                                 /*  On OP_READLINE, it's for <<>>, not <> */
+                                /*  On OP_RETURN, module_true is in effect */
+                                /*  On OP_NEXT/OP_LAST/OP_REDO, there is no
+                                 *  loop label */
 /* There is no room in op_flags for this one, so it has its own bit-
    field member (op_folded) instead.  The flag is only used to tell
    op_convert_list to set op_folded.  */
@@ -248,8 +259,7 @@ struct methop {
     BASEOP
     union {
         /* op_u.op_first *must* be aligned the same as the op_first
-         * field of the other op types, and op_u.op_meth_sv *must*
-         * be aligned with op_sv */
+         * field of the other op types */
         OP* op_first;   /* optree for method name */
         SV* op_meth_sv; /* static method name */
     } op_u;
@@ -286,9 +296,16 @@ struct pmop {
     OP *	op_code_list;	/* list of (?{}) code blocks */
 };
 
+/* The PM_GETRE_raw/PM_SETRE_raw variants get/set the slot without any
+ * processing or asserts */
 #ifdef USE_ITHREADS
+#define PM_GETRE_raw(o)	(REGEXP*)(PL_regex_pad[(o)->op_pmoffset])
 #define PM_GETRE(o)	(SvTYPE(PL_regex_pad[(o)->op_pmoffset]) == SVt_REGEXP \
                          ? (REGEXP*)(PL_regex_pad[(o)->op_pmoffset]) : NULL)
+
+#define PM_SETRE_raw(o,r)	STMT_START {					\
+                            PL_regex_pad[(o)->op_pmoffset] = MUTABLE_SV(r); \
+                        } STMT_END
 /* The assignment is just to enforce type safety (or at least get a warning).
  */
 /* With first class regexps not via a reference one needs to assign
@@ -303,7 +320,9 @@ struct pmop {
                             PL_regex_pad[(o)->op_pmoffset] = MUTABLE_SV(_pm_setre); \
                         } STMT_END
 #else
+#define PM_GETRE_raw(o) ((o)->op_pmregexp)
 #define PM_GETRE(o)     ((o)->op_pmregexp)
+#define PM_SETRE_raw(o,r) ((o)->op_pmregexp = (r))
 #define PM_SETRE(o,r)   ((o)->op_pmregexp = (r))
 #endif
 
@@ -469,6 +488,7 @@ struct loop {
 #define cPVOP		cPVOPx(PL_op)
 #define cCOP		cCOPx(PL_op)
 #define cLOOP		cLOOPx(PL_op)
+#define cMETHOP         cMETHOPx(PL_op)
 
 #define cUNOPo		cUNOPx(o)
 #define cUNOP_AUXo	cUNOP_AUXx(o)
@@ -481,6 +501,7 @@ struct loop {
 #define cPVOPo		cPVOPx(o)
 #define cCOPo		cCOPx(o)
 #define cLOOPo		cLOOPx(o)
+#define cMETHOPo        cMETHOPx(o)
 
 #define kUNOP		cUNOPx(kid)
 #define kUNOP_AUX	cUNOP_AUXx(kid)
@@ -493,6 +514,7 @@ struct loop {
 #define kPVOP		cPVOPx(kid)
 #define kCOP		cCOPx(kid)
 #define kLOOP		cLOOPx(kid)
+#define kMETHOP         cMETHOPx(kid)
 
 
 typedef enum {
@@ -514,33 +536,40 @@ typedef enum {
 
 
 #ifdef USE_ITHREADS
-#  define	cGVOPx_gv(o)	((GV*)PAD_SVl(cPADOPx(o)->op_padix))
+#  define cGVOPx_gv(o)  ((GV*)PAD_SVl(cPADOPx(o)->op_padix))
 #  ifndef PERL_CORE
-#    define	IS_PADGV(v)	(v && isGV(v))
-#    define	IS_PADCONST(v) \
+#    define IS_PADGV(v) (v && isGV(v))
+#    define IS_PADCONST(v) \
         (v && (SvREADONLY(v) || (SvIsCOW(v) && !SvLEN(v))))
 #  endif
-#  define	cSVOPx_sv(v)	(cSVOPx(v)->op_sv \
+#  define cSVOPx_sv(v)  (cSVOPx(v)->op_sv \
                                  ? cSVOPx(v)->op_sv : PAD_SVl((v)->op_targ))
-#  define	cSVOPx_svp(v)	(cSVOPx(v)->op_sv \
+#  define cSVOPx_svp(v) (cSVOPx(v)->op_sv \
                                  ? &cSVOPx(v)->op_sv : &PAD_SVl((v)->op_targ))
-#  define	cMETHOPx_rclass(v) PAD_SVl(cMETHOPx(v)->op_rclass_targ)
+#  define       cMETHOPx_meth(v) (cMETHOPx(v)->op_u.op_meth_sv \
+                                  ? cMETHOPx(v)->op_u.op_meth_sv : PAD_SVl((v)->op_targ))
+#  define cMETHOPx_rclass(v) PAD_SVl(cMETHOPx(v)->op_rclass_targ)
 #else
-#  define	cGVOPx_gv(o)	((GV*)cSVOPx(o)->op_sv)
+#  define cGVOPx_gv(o)  ((GV*)cSVOPx(o)->op_sv)
 #  ifndef PERL_CORE
-#    define	IS_PADGV(v)	FALSE
-#    define	IS_PADCONST(v)	FALSE
+#    define IS_PADGV(v) FALSE
+#    define IS_PADCONST(v)      FALSE
 #  endif
-#  define	cSVOPx_sv(v)	(cSVOPx(v)->op_sv)
-#  define	cSVOPx_svp(v)	(&cSVOPx(v)->op_sv)
-#  define	cMETHOPx_rclass(v) (cMETHOPx(v)->op_rclass_sv)
+#  define cSVOPx_sv(v)  (cSVOPx(v)->op_sv)
+#  define cSVOPx_svp(v) (&cSVOPx(v)->op_sv)
+#  define       cMETHOPx_meth(v)   (cMETHOPx(v)->op_u.op_meth_sv)
+#  define cMETHOPx_rclass(v) (cMETHOPx(v)->op_rclass_sv)
 #endif
 
-#define	cMETHOPx_meth(v)	cSVOPx_sv(v)
+#define cMETHOP_meth            cMETHOPx_meth(PL_op)
+#define cMETHOP_rclass          cMETHOPx_rclass(PL_op)
 
-#define	cGVOP_gv		cGVOPx_gv(PL_op)
-#define	cGVOPo_gv		cGVOPx_gv(o)
-#define	kGVOP_gv		cGVOPx_gv(kid)
+#define cMETHOPo_meth           cMETHOPx_meth(o)
+#define cMETHOPo_rclass         cMETHOPx_rclass(o)
+
+#define cGVOP_gv                cGVOPx_gv(PL_op)
+#define cGVOPo_gv               cGVOPx_gv(o)
+#define kGVOP_gv                cGVOPx_gv(kid)
 #define cSVOP_sv		cSVOPx_sv(PL_op)
 #define cSVOPo_sv		cSVOPx_sv(o)
 #define kSVOP_sv		cSVOPx_sv(kid)
@@ -601,6 +630,7 @@ typedef enum {
  * The same mutex is used to protect the refcounts of the reg_trie_data
  * and reg_ac_data structures, which are shared between duplicated
  * regexes.
+ * The same mutex is used to protect the refcounts for RCPV objects.
  */
 
 #ifdef USE_ITHREADS
@@ -768,29 +798,29 @@ struct block_hooks {
 =for apidoc mx|U32|BhkFLAGS|BHK *hk
 Return the BHK's flags.
 
-=for apidoc mxu|void *|BhkENTRY|BHK *hk|which
+=for apidoc mxu|void *|BhkENTRY|BHK *hk|token which
 Return an entry from the BHK structure.  C<which> is a preprocessor token
 indicating which entry to return.  If the appropriate flag is not set
 this will return C<NULL>.  The type of the return value depends on which
 entry you ask for.
 
-=for apidoc Amxu|void|BhkENTRY_set|BHK *hk|which|void *ptr
+=for apidoc Amxu|void|BhkENTRY_set|BHK *hk|token which|void *ptr
 Set an entry in the BHK structure, and set the flags to indicate it is
 valid.  C<which> is a preprocessing token indicating which entry to set.
 The type of C<ptr> depends on the entry.
 
-=for apidoc Amxu|void|BhkDISABLE|BHK *hk|which
+=for apidoc Amxu|void|BhkDISABLE|BHK *hk|token which
 Temporarily disable an entry in this BHK structure, by clearing the
 appropriate flag.  C<which> is a preprocessor token indicating which
 entry to disable.
 
-=for apidoc Amxu|void|BhkENABLE|BHK *hk|which
+=for apidoc Amxu|void|BhkENABLE|BHK *hk|token which
 Re-enable an entry in this BHK structure, by setting the appropriate
 flag.  C<which> is a preprocessor token indicating which entry to enable.
 This will assert (under -DDEBUGGING) if the entry doesn't contain a valid
 pointer.
 
-=for apidoc mxu|void|CALL_BLOCK_HOOKS|which|arg
+=for apidoc mxu|void|CALL_BLOCK_HOOKS|token which|arg
 Call all the registered block hooks for type C<which>.  C<which> is a
 preprocessing token; the type of C<arg> depends on C<which>.
 
@@ -866,7 +896,7 @@ preprocessing token; the type of C<arg> depends on C<which>.
 =for apidoc Am|U32|XopFLAGS|XOP *xop
 Return the XOP's flags.
 
-=for apidoc Am||XopENTRY|XOP *xop|which
+=for apidoc Amu||XopENTRY|XOP *xop|token which
 Return a member of the XOP structure.  C<which> is a cpp token
 indicating which entry to return.  If the member is not set
 this will return a default value.  The return type depends
@@ -874,21 +904,21 @@ on C<which>.  This macro evaluates its arguments more than
 once.  If you are using C<Perl_custom_op_xop> to retrieve a
 C<XOP *> from a C<OP *>, use the more efficient L</XopENTRYCUSTOM> instead.
 
-=for apidoc Am||XopENTRYCUSTOM|const OP *o|which
+=for apidoc Amu||XopENTRYCUSTOM|const OP *o|token which
 Exactly like C<XopENTRY(XopENTRY(Perl_custom_op_xop(aTHX_ o), which)> but more
 efficient.  The C<which> parameter is identical to L</XopENTRY>.
 
-=for apidoc Am|void|XopENTRY_set|XOP *xop|which|value
+=for apidoc Amu|void|XopENTRY_set|XOP *xop|token which|value
 Set a member of the XOP structure.  C<which> is a cpp token
 indicating which entry to set.  See L<perlguts/"Custom Operators">
 for details about the available members and how
 they are used.  This macro evaluates its argument
 more than once.
 
-=for apidoc Am|void|XopDISABLE|XOP *xop|which
+=for apidoc Amu|void|XopDISABLE|XOP *xop|token which
 Temporarily disable a member of the XOP, by clearing the appropriate flag.
 
-=for apidoc Am|void|XopENABLE|XOP *xop|which
+=for apidoc Amu|void|XopENABLE|XOP *xop|token which
 Reenable a member of the XOP which has been disabled.
 
 =cut
@@ -900,6 +930,7 @@ struct custom_op {
     const char	   *xop_desc;
     U32		    xop_class;
     void	  (*xop_peep)(pTHX_ OP *o, OP *oldop);
+    void          (*xop_dump)(pTHX_ const OP *o, struct Perl_OpDumpContext *ctx);
 };
 
 /* return value of Perl_custom_op_get_field, similar to void * then casting but
@@ -910,6 +941,7 @@ typedef union {
     const char	   *xop_desc;
     U32		    xop_class;
     void	  (*xop_peep)(pTHX_ OP *o, OP *oldop);
+    void	  (*xop_dump)(pTHX_ const OP *o, struct Perl_OpDumpContext *ctx);
     XOP            *xop_ptr;
 } XOPRETANY;
 
@@ -919,6 +951,7 @@ typedef union {
 #define XOPf_xop_desc	0x02
 #define XOPf_xop_class	0x04
 #define XOPf_xop_peep	0x08
+#define XOPf_xop_dump	0x10
 
 /* used by Perl_custom_op_get_field for option checking */
 typedef enum {
@@ -926,13 +959,15 @@ typedef enum {
     XOPe_xop_name = XOPf_xop_name,
     XOPe_xop_desc = XOPf_xop_desc,
     XOPe_xop_class = XOPf_xop_class,
-    XOPe_xop_peep = XOPf_xop_peep
+    XOPe_xop_peep = XOPf_xop_peep,
+    XOPe_xop_dump = XOPf_xop_dump,
 } xop_flags_enum;
 
 #define XOPd_xop_name	PL_op_name[OP_CUSTOM]
 #define XOPd_xop_desc	PL_op_desc[OP_CUSTOM]
 #define XOPd_xop_class	OA_BASEOP
 #define XOPd_xop_peep	((Perl_cpeep_t)0)
+#define XOPd_xop_dump   NULL
 
 #define XopENTRY_set(xop, which, to) \
     STMT_START { \
@@ -1052,6 +1087,9 @@ C<sib> is non-null. For a higher-level interface, see C<L</op_sibling_splice>>.
 #define OP_TYPE_ISNT_AND_WASNT(o, type) \
     ( (o) && OP_TYPE_ISNT_AND_WASNT_NN(o, type) )
 
+#define OP_TYPE_IS_COP_NN(o) \
+    (OP_TYPE_IS_NN(o, OP_NEXTSTATE) || OP_TYPE_IS_NN(o, OP_DBSTATE))
+
 /* should match anything that uses ck_ftst in regen/opcodes */
 #define OP_IS_STAT(op) (OP_IS_FILETEST(op) || (op) == OP_LSTAT || (op) == OP_STAT)
 
@@ -1148,6 +1186,8 @@ struct op_argcheck_aux {
     UV   opt_params; /* number of optional positional parameters */
     char slurpy;     /* presence of slurpy: may be '\0', '@' or '%' */
 };
+
+#define MI_INIT_WORKAROUND_PACK "Module::Install::DSL"
 
 
 /*

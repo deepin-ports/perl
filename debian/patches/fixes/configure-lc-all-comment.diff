@@ -1,0 +1,32 @@
+From: Niko Tyni <ntyni@debian.org>
+Date: Fri, 24 Apr 2026 22:36:25 +0300
+Subject: Update a Configure comment to match metaconfig output
+
+This part of perl5.git commit 2d6c900450f4de81292176cb7526621fc5ae6a84
+was not present in the metaconfig.git upstream backport commit
+561ff7b60a40cd1354053117ada2c715780b9e92 that we use to make
+sure Configure can be regenerated from the metaconfig sources.
+
+No functional changes.
+
+Bug: https://github.com/Perl/perl5/issues/22992
+Origin: backport, https://github.com/Perl/perl5/commit/2d6c900450f4de81292176cb7526621fc5ae6a84
+---
+ Configure | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Configure b/Configure
+index 5a37328..bc953d1 100755
+--- a/Configure
++++ b/Configure
+@@ -17481,9 +17481,9 @@ $rm_try
+     esac
+ esac
+ 
++: Check the syntax of LC_ALL when categories are set to different locales
+ case "$perl_lc_all_separator$perl_lc_all_category_positions_init" in
+   "")
+-    : Check the syntax of LC_ALL when categories are set to different locales
+     echo " "
+     $echo "Checking the syntax of LC_ALL when categories are set to different locales..." >&4
+ 

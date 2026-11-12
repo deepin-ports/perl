@@ -3,8 +3,9 @@
 use strict ;
 require 5.006 ;
 
-$::VERSION = '2.106' ;
-$::DEP_VERSION = '2.103';
+$::VERSION = '2.222' ;
+$::DEP_ZLIB_VERSION = '2.222';
+$::DEP_BZIP2_VERSION = '2.218';
 
 use lib '.';
 use private::MakeUtil;
@@ -25,10 +26,11 @@ WriteMakefile(
     (
       $ENV{SKIP_FOR_CORE}
         ? ()
-	    : (PREREQ_PM   => { 'Compress::Raw::Bzip2' => $::DEP_VERSION,
-		                    'Compress::Raw::Zlib'  => $::DEP_VERSION,
+	    : (PREREQ_PM   => { 'Compress::Raw::Bzip2' => $::DEP_BZIP2_VERSION,
+		                    'Compress::Raw::Zlib'  => $::DEP_ZLIB_VERSION,
 		                    'Scalar::Util'  => 0,
                             'Encode'        => 0,
+                            'Time::Local'   => 0,
 		                    $] >= 5.005 && $] < 5.006
                                 ? ('File::BSDGlob' => 0)
                                 : () }

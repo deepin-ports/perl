@@ -1,2 +1,6 @@
 # the lintian check doesn't understand diversions
 binaries-have-file-conflict perl perl-doc usr/bin/perldoc
+# not an ar file
+unpack-message-for-orig perl_5.42.0.orig-regen-configure.tar.xz . ar failed for metaconfig-5.42.0/dist/lib/errnolist.a
+# salsa CI (sometimes?) runs without the separate orig-regen-configure tarball
+unpack-message-for-orig perl_5.42.0.orig.tar.xz . ar failed for perl-5.42.0/regen-configure/dist/lib/errnolist.a

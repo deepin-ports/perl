@@ -619,19 +619,6 @@ EXPECT
 -w
 "x" =~ /(\G?x)?/;
 ########
-# Bug 20010515.004 (#6998)
-my @h = 1 .. 10;
-bad(@h);
-sub bad {
-   undef @h;
-   warn "O\n";
-   print for @_;
-   warn "K\n";
-}
-EXPECT
-O
-Use of freed value in iteration at - line 7.
-########
 # Bug 20010506.041 (#6952)
 "abcd\x{1234}" =~ /(a)(b[c])(d+)?/i and print "ok\n";
 EXPECT
@@ -680,7 +667,6 @@ print join '', @a, "\n";
 EXPECT
 123456789
 ######## example from Camel 5, ch. 15, pp.406 (with my)
-# SKIP: ord "A" == 193 # EBCDIC
 use strict;
 use utf8;
 my $人 = 2; # 0xe4 0xba 0xba: U+4eba, "human" in CJK ideograph
@@ -689,7 +675,6 @@ print $人, "\n";
 EXPECT
 3
 ######## example from Camel 5, ch. 15, pp.406 (with our)
-# SKIP: ord "A" == 193 # EBCDIC
 use strict;
 use utf8;
 our $人 = 2; # 0xe4 0xba 0xba: U+4eba, "human" in CJK ideograph
@@ -698,7 +683,6 @@ print $人, "\n";
 EXPECT
 3
 ######## example from Camel 5, ch. 15, pp.406 (with package vars)
-# SKIP: ord "A" == 193 # EBCDIC
 use utf8;
 $人 = 2; # 0xe4 0xba 0xba: U+4eba, "human" in CJK ideograph
 $人++; # a child is born
@@ -706,7 +690,6 @@ print $人, "\n";
 EXPECT
 3
 ######## example from Camel 5, ch. 15, pp.406 (with use vars)
-# SKIP: ord "A" == 193 # EBCDIC
 use strict;
 use utf8;
 use vars qw($人);
@@ -817,8 +800,6 @@ meow {
 };
 EXPECT
 syntax error at - line 12, near "used"
-syntax error at - line 12, near "used}"
-Unmatched right curly bracket at - line 14, at end of line
 Execution of - aborted due to compilation errors.
 ######## [perl #112312] crash on syntax error - another test
 # SKIP: !defined &DynaLoader::boot_DynaLoader # miniperl
@@ -849,6 +830,4 @@ sub testo {
 
 EXPECT
 syntax error at - line 15, near "used"
-syntax error at - line 15, near "used}"
-Unmatched right curly bracket at - line 17, at end of line
 Execution of - aborted due to compilation errors.

@@ -14,4 +14,4 @@ fi
 cd debian/
 rename "s/$old/$upstream_major/" *
 sed -i "s/$old.0/$upstream/g" libperl*.symbols
-sed -i "s/$old/$upstream_major/g" control perl.postinst perl.README.Debian libperl*.symbols t/control.t
+sed -i "s/$old/$upstream_major/g" control perl.postinst perl.README.Debian libperl*.symbols t/control.t *.lintian-overrides source/lintian-overrides

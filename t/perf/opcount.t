@@ -675,7 +675,6 @@ test_opcount(0, "multiconcat: local assign",
 
 {
     use feature 'try';
-    no warnings 'experimental::try';
 
     test_opcount(0, "try/catch: catch block is optimized",
                     sub { my @a; try {} catch($e) { $a[0] } },
@@ -708,12 +707,12 @@ test_opcount(0, "builtin::true/false are replaced with constants",
                 });
 
 test_opcount(0, "builtin::is_bool is replaced with direct opcode",
-                sub { my $x; my $y; $y = builtin::is_bool($x); },
+                sub { my $x; my $y; $y = builtin::is_bool($x); 1; },
                 {
                     entersub => 0,
                     is_bool  => 1,
-                    padsv    => 3, # OA_TARGLEX applies so only 3, not 4
-                    sassign  => 0,
+                    padsv    => 3,
+                    padsv_store  => 1,
                 });
 
 test_opcount(0, "builtin::is_bool gets constant-folded",
@@ -779,6 +778,332 @@ test_opcount(0, "builtin::floor is replaced with direct opcode",
                 {
                     entersub => 0,
                     floor    => 1,
+                });
+
+test_opcount(0, "builtin::is_tainted is replaced with direct opcode",
+                sub { builtin::is_tainted($0); },
+                {
+                    entersub   => 0,
+                    is_tainted => 1,
+                });
+
+# void sassign + padsv combinations are replaced by padsv_store
+test_opcount(0, "sassign + padsv replaced by padsv_store",
+                sub { my $y; my $z = $y = 3; 1; },
+                {
+                    padsv        => 2,
+                    padsv_store  => 1,
+                });
+
+# OPpTARGET_MY optimizations on undef
+test_opcount(0, "undef + padsv (undef my \$x) is reduced to undef",
+                sub { undef my $x },
+                {
+                    undef       => 1,
+                    padsv       => 0,
+                    padsv_store => 0,
+                    sassign     => 0,
+                });
+test_opcount(0, "undef + padsv + sassign (my \$x = undef) is reduced to undef",
+                sub { my $x = undef },
+                {
+                    undef       => 1,
+                    padsv       => 0,
+                    padsv_store => 0,
+                    sassign     => 0,
+                });
+test_opcount(0, "undef + padsv (undef \$x) is reduced to undef",
+                sub { my $x; undef $x },
+                {
+                    undef       => 1,
+                    padsv       => 1,
+                    padsv_store => 0,
+                    sassign     => 0,
+                });
+test_opcount(0, "undef + padsv + sassign (\$x = undef) is reduced to undef",
+                sub { my $x; $x = undef },
+                {
+                    undef       => 1,
+                    padsv       => 1,
+                    padsv_store => 0,
+                    sassign     => 0,
+                });
+# Additional test cases requested by demerphq
+test_opcount(0, 'my $y= 1; my @x= ($y= undef);',
+                sub { my $y= 1; my @x= ($y= undef); },
+                {
+                    undef       => 1,
+                    aassign     => 1,
+                    padav       => 1,
+                    padsv       => 0,
+                    padsv_store => 1,
+                    sassign     => 0,
+                });
+
+test_opcount(0, 'my $x= 1; sub f{} f($x=undef);',
+                sub { my $x= 1; sub f{} f($x=undef); },
+                {
+                    undef       => 1,
+                    gv          => 1,
+                    padsv       => 0,
+                    padsv_store => 1,
+                    sassign     => 0,
+                });
+
+test_opcount(0, 'my ($x,$p)=(1,2); sub g{} g(($x=undef),$p);',
+                sub { my ($x,$p)=(1,2); sub g{} g(($x=undef),$p); },
+                {
+                    undef       => 1,
+                    aassign     => 1,
+                    gv          => 1,
+                    padrange    => 1,
+                    padsv       => 3,
+                    padsv_store => 0,
+                    sassign     => 0,
+                });
+
+test_opcount(0, 'my $h= {}; my @k= keys %{($h=undef)||{}};',
+                sub { my $h= {}; my @k= keys %{($h=undef)||{}}; },
+                {
+                    undef       => 1,
+                    aassign     => 1,
+                    emptyavhv   => 2,
+                    padav       => 1,
+                    padsv       => 0,
+                    padsv_store => 0,
+                    sassign     => 0,
+                });
+
+test_opcount(0, 'my $y= 1; my @x= \($y= undef);',
+                sub { my $y= 1; my @x= \($y= undef); },
+                {
+                    undef       => 1,
+                    aassign     => 1,
+                    padav       => 1,
+                    padsv       => 0,
+                    padsv_store => 1,
+                    sassign     => 0,
+                    srefgen     => 1,
+                });
+
+# aelemfast_lex + sassign are replaced by a combined OP
+test_opcount(0, "simple aelemfast_lex + sassign replacement",
+                sub { my @x; $x[0] = "foo"; 1 },
+                {
+                    aelemfast_lex      => 0,
+                    aelemfastlex_store => 1,
+                    padav              => 1,
+                    sassign            => 0,
+                });
+
+# aelemfast_lex + sassign are not replaced by a combined OP
+# when key <0 (not handled, to keep the pp_ function simple
+test_opcount(0, "aelemfast_lex + sassign replacement with neg key",
+                sub { my @x = (1,2); $x[-1] = 7; 1 },
+                {
+                    aelemfast_lex      => 0,
+                    aelemfastlex_store => 1,
+                    padav              => 1,
+                    sassign            => 0,
+                });
+
+# aelemfast_lex + sassign optimization does not disrupt multideref
+test_opcount(0, "no aelemfast_lex + sassign replacement with multideref",
+                sub { my @x = ([1,2]); $x[0][1] = 1; },
+                {
+                    aelemfast_lex      => 0,
+                    aelemfastlex_store => 0,
+                    multideref         => 1,
+                    padav              => 1,
+                    sassign            => 1,
+                });
+
+# emptyavhv optimizations
+
+test_opcount(0, "Empty anonlist",
+                sub { [] },
+                {
+                    anonlist  => 0,
+                    emptyavhv => 1,
+                    sassign   => 0,
+                });
+test_opcount(0, "Empty anonlist with global assignment",
+                sub { our $x; $x = [] },
+                {
+                    anonlist  => 0,
+                    emptyavhv => 1,
+                    gvsv      => 1,
+                    pushmark  => 0,
+                    sassign   => 1,
+                });
+test_opcount(0, "Empty anonlist and lexical assignment",
+                sub { my $x; $x = [] },
+                {
+                    anonlist  => 0,
+                    emptyavhv => 1,
+                    padsv     => 1,
+                    pushmark  => 0,
+                    sassign   => 0,
+                });
+test_opcount(0, "Empty anonlist and direct lexical assignment",
+                sub { my $x = [] },
+                {
+                    anonlist  => 0,
+                    emptyavhv => 1,
+                    padsv     => 0,
+                    pushmark  => 0,
+                    sassign   => 0,
+                });
+test_opcount(0, "Empty anonlist ref and direct lexical assignment",
+                sub { my $x = \[]; 1; },
+                {
+                    anonlist    => 0,
+                    emptyavhv   => 1,
+                    padsv       => 0,
+                    padsv_store => 1,
+                    pushmark    => 0,
+                    sassign     => 0,
+                    srefgen     => 1,
+                });
+test_opcount(0, "Empty anonhash",
+                sub { {} },
+                {
+                    anonhash  => 0,
+                    emptyavhv => 1,
+                    sassign   => 0,
+                });
+test_opcount(0, "Empty anonhash with global assignment",
+                sub { our $x; $x = {} },
+                {
+                    anonhash  => 0,
+                    emptyavhv => 1,
+                    gvsv      => 1,
+                    pushmark  => 0,
+                    sassign   => 1,
+                });
+test_opcount(0, "Empty anonhash and lexical assignment",
+                sub { my $x; $x = {} },
+                {
+                    anonhash  => 0,
+                    emptyavhv => 1,
+                    padsv     => 1,
+                    pushmark  => 0,
+                    sassign   => 0,
+                });
+test_opcount(0, "Empty anonhash and direct lexical assignment",
+                sub { my $x = {} },
+                {
+                    anonhash  => 0,
+                    emptyavhv => 1,
+                    padsv     => 0,
+                    pushmark  => 0,
+                    sassign   => 0,
+                });
+test_opcount(0, "Empty anonhash ref and direct lexical assignment",
+                sub { my $x = \{}; 1 },
+                {
+                    anonhash    => 0,
+                    emptyavhv   => 1,
+                    padsv       => 0,
+                    padsv_store => 1,
+                    pushmark    => 0,
+                    sassign     => 0,
+                    srefgen     => 1,
+                });
+
+test_opcount(0, "foreach 2 lexicals on builtin::indexed ARRAY",
+                sub { my @input = (); foreach my ($i, $x) (builtin::indexed @input) { } },
+                {
+                    entersub => 0, # no call to builtin::indexed
+                    enteriter => 1,
+                    iter => 1,
+                    padav => 2,
+                });
+
+test_opcount(0, "foreach 2 lexicals on builtin::indexed LIST",
+                sub { foreach my ($i, $x) (builtin::indexed qw( x y z )) { } },
+                {
+                    entersub => 0, # no call to builtin::indexed
+                    enteriter => 1,
+                    iter => 1,
+                });
+
+# substr with const zero offset and "" replacements
+test_opcount(0, "substr with const zero offset and '' repl (void)",
+                sub { my $z; substr($z, 0, 2, "") },
+                {
+                    substr       => 0,
+                    substr_left  => 1,
+                    const        => 1,
+                });
+
+test_opcount(0, "substr with const zero offset and '' repl (lexical)",
+                sub { my $z; my $x = substr($z, 0, 2, "") },
+                {
+                    substr       => 0,
+                    substr_left  => 1,
+                    const        => 1,
+                    padsv        => 3,
+                    sassign      => 1
+                });
+
+test_opcount(0, "substr with const zero offset and '' repl (lexical TARGMY)",
+                sub { my ($z, $x); $x = substr($z, 0, 2, "") },
+                {
+                    substr       => 0,
+                    substr_left  => 1,
+                    const        => 1,
+                    padsv        => 3,
+                    padsv_store  => 0,
+                    sassign      => 0
+                });
+
+test_opcount(0, "substr with const zero offset and '' repl (gv)",
+                sub { my $z; our $x = substr($z, 0, 2, "") },
+                {
+                    substr       => 0,
+                    substr_left  => 1,
+                    const        => 1,
+                    gvsv         => 1,
+                    sassign      => 1
+                });
+
+test_opcount(0, "substr with const zero offset (void)",
+                sub { my $z; substr($z, 0, 2) },
+                {
+                    substr       => 0,
+                    substr_left  => 1,
+                    const        => 1,
+                });
+
+test_opcount(0, "substr with const zero offset (lexical)",
+                sub { my $z; my $x = substr($z, 0, 2) },
+                {
+                    substr       => 0,
+                    substr_left  => 1,
+                    const        => 1,
+                    padsv        => 3,
+                    sassign      => 1
+                });
+
+test_opcount(0, "substr with const zero offset (lexical TARGMY)",
+                sub { my ($z, $x); $x = substr($z, 0, 2) },
+                {
+                    substr       => 0,
+                    substr_left  => 1,
+                    const        => 1,
+                    padsv        => 3,
+                    sassign      => 0
+                });
+
+test_opcount(0, "substr with const zero offset  (gv)",
+                sub { my $z; our $x = substr($z, 0, 2) },
+                {
+                    substr       => 0,
+                    substr_left  => 1,
+                    const        => 1,
+                    gvsv         => 1,
+                    sassign      => 1
                 });
 
 done_testing();

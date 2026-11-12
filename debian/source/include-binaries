@@ -39,3 +39,5 @@ debian/tests/data/s390x/buster-ndbm.dir
 debian/tests/data/s390x/buster-ndbm.pag
 debian/tests/data/s390x/stretch.gdbm
 debian/tests/data/s390x/stretch-ndbm.pag
+# binary zip file for a test case
+debian/patches/fixes/CVE-2025-15649.diff

@@ -182,13 +182,12 @@ Intel*) ;; # # Is that you, Intel C++?
 #   longer then the ANSI C99 minimum of 4095 bytes.
 #
 # NOTE 3: the relative order of these options matters:
-# -Wextra before -W
-# -W before -Wno-long-long -Wno-declaration-after-statement
+# -Wextra before -Wno-long-long -Wno-declaration-after-statement
 #
 *) warns="$pedantic \
 	-Werror=pointer-arith \
 	-Werror=vla \
-	-Wextra -W \
+	-Wextra \
 	-Wno-long-long -Wno-declaration-after-statement \
 	-Wc++-compat -Wwrite-strings"
    case " $ccflags " in
@@ -220,17 +219,6 @@ Intel*) ;; # # Is that you, Intel C++?
                -std*)
                  echo "cflags.SH: Adding $opt."
                  stdflags="$stdflags $opt"
-                 ;;
-               -W)
-                 # -Wextra is the modern form of -W, so add
-                 # -W only if -Wextra is not there already.
-                 case " $warn " in
-                 *-Wextra*) ;;
-                 *)
-                   echo "cflags.SH: Adding $opt."
-                   warn="$warn $opt"
-                   ;;
-                 esac
                  ;;
                -Werror=pointer-arith)
                   # -pedantic* covers -Werror=p-a
@@ -376,6 +364,19 @@ case "$gccversion" in
   done
 ;;
 esac
+;;
+esac
+
+# gcc version 12 and 13 are overly aggressive with use-after-free warnings
+# and have false positives on code that shouldn't warn, and they haven't
+# sorted it out yet. See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=108115
+case "$gccversion" in
+"1"[23]*)
+    for f in -Wno-use-after-free
+    do
+        echo "cflags.SH: Adding $f because of false positives in gccversion '$gccversion'"
+        warn="$warn $f"
+    done
 ;;
 esac
 

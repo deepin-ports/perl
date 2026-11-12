@@ -1207,7 +1207,7 @@ hashref of optimization data discovered about a compiled regexp.
 
 The C<PERL_GLOBAL_STRUCT> compilation option has been removed, and
 with it the need or the C<dVAR> macro.  C<dVAR> remains defined as a
-no-op outside C<PERL_CORE> for backwards compatiblity with XS modules.
+no-op outside C<PERL_CORE> for backwards compatibility with XS modules.
 
 =item *
 
@@ -1300,7 +1300,7 @@ operations.
 
 C<semctl()>, C<msgctl()>, and C<shmctl()> now attempt to downgrade the C<ARG>
 parameter if its value is being used as input to C<IPC_SET> or
-C<SETALL> calls.  A failed downgrade will thrown an exception.
+C<SETALL> calls.  A failed downgrade will throw an exception.
 
 =item *
 
@@ -1395,7 +1395,7 @@ Aaron Crane, Adam Hartley, Andy Dougherty, Ben Cornett, Branislav
 Zahradník, brian d foy, Chris 'BinGOs' Williams, Christian Walde
 (Mithaldu), Craig A. Berry, Dagfinn Ilmari Mannsåker, Dan Book, Daniel
 Böhmer, Daniel Laügt, Dan Kogai, David Cantrell, David Mitchell, Dominic
-Hamon, E. Choroba, Ed J, Eric Herman, Eric Lindblad, Eugene Alvin Villar,
+Hamon, E. Choroba, Ed J, Eric Herman, Eugene Alvin Villar,
 Felipe Gasper, Giovanni Tataranni, Graham Knop, Graham Ollis, Hauke D,
 H.Merijn Brand, Hugo van der Sanden, Ichinose Shogo, Ivan Baidakou, Jae
 Bradley, James E Keenan, Jason McIntosh, jkahrman, John Karr, John Lightsey,

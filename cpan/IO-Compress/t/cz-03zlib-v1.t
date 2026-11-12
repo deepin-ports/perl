@@ -21,7 +21,7 @@ BEGIN
     # use Test::NoWarnings, if available
     my $extra = 0 ;
     $extra = 1
-        if eval { require Test::NoWarnings ;  import Test::NoWarnings; 1 };
+        if eval { require Test::NoWarnings ;  Test::NoWarnings->import; 1 };
 
     my $count = 0 ;
     if ($] < 5.005) {
@@ -69,11 +69,11 @@ my $fil;
 
 eval { compress([1]); };
 ok $@ =~ m#not a scalar reference#
-    or print "# $@\n" ;;
+    or print "# $@\n" ;
 
 eval { uncompress([1]); };
 ok $@ =~ m#not a scalar reference#
-    or print "# $@\n" ;;
+    or print "# $@\n" ;
 
 $hello = "hello mum" ;
 my $keep_hello = $hello ;
@@ -703,7 +703,8 @@ EOM
     ($GOT, $status) = $k->inflate($rest) ;
 
     # Z_STREAM_END returned by 1.12.2, Z_DATA_ERROR for older zlib
-    if (ZLIB_VERNUM >= ZLIB_1_2_12_0)
+    # always Z_STREAM_ENDin zlib_ng
+    if (ZLIB_VERNUM >= ZLIB_1_2_12_0 || Compress::Raw::Zlib::is_zlibng)
     {
         cmp_ok $status, '==', Z_STREAM_END ;
     }

@@ -3,17 +3,19 @@ package utf8;
 use strict;
 use warnings;
 
-our $hint_bits = 0x00800000;
+our $utf8_hint_bits  = 0x00800000;
+our $ascii_hint_bits = 0x00000010;  # Turned off when utf8 turned on
 
-our $VERSION = '1.24';
+our $VERSION = '1.27';
 our $AUTOLOAD;
 
 sub import {
-    $^H |= $hint_bits;
+    $^H |= $utf8_hint_bits;
+    $^H &= ~$ascii_hint_bits;
 }
 
 sub unimport {
-    $^H &= ~$hint_bits;
+    $^H &= ~$utf8_hint_bits;
 }
 
 sub AUTOLOAD {
@@ -114,6 +116,8 @@ sequence in the native encoding (Latin-1 or EBCDIC) to UTF-8. The
 logical character sequence itself is unchanged.  If I<$string> is already
 upgraded, then this is a no-op. Returns the
 number of octets necessary to represent the string as UTF-8.
+Since Perl v5.38, if C<$string> is C<undef> no action is taken; prior to that,
+it would be converted to be defined and zero-length.
 
 If your code needs to be compatible with versions of perl without
 C<use feature 'unicode_strings';>, you can force Unicode semantics on

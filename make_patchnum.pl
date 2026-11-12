@@ -51,14 +51,6 @@ our $opt_v = scalar grep $_ eq '-v', @ARGV;
 
 BEGIN {
     my $root=".";
-    # test 1st to see if we're a -Dmksymlinks target dir
-    $subcd = '';
-    $srcdir = $root;
-    if (-l "./Configure") {
-	$srcdir = readlink("./Configure");
-	$srcdir =~ s/Configure//;
-	$subcd = "cd $srcdir &&"; # activate backtick fragment
-    }
     while (!-e "$root/perl.c" and length($root)<100) {
         if ($root eq '.') {
             $root="..";
@@ -68,6 +60,15 @@ BEGIN {
     }
     die "Can't find toplevel" if !-e "$root/perl.c";
     sub path_to { "$root/$_[0]" } # use $_[0] if this'd be placed in toplevel.
+
+    # test to see if we're a -Dmksymlinks target dir
+    $subcd = '';
+    $srcdir = $root;
+    if (-l "$root/Configure") {
+        $srcdir = readlink("$root/Configure");
+        $srcdir =~ s/Configure//;
+        $subcd = "cd $srcdir &&"; # activate backtick fragment
+    }
 }
 
 sub read_file {
@@ -134,7 +135,7 @@ if (my $patch_file= read_file(".patch")) {
 }
 elsif ($git_patch_file = read_file(".git_patch") and $git_patch_file !~ /\A\$Format:%H/) {
     chomp $git_patch_file;
-    ($commit_id, my $commit_date, my $names)
+    ($commit_id, my $commit_date, $describe, my $names)
         = split /\|/, $git_patch_file;
 
     my @names = split /,\s*/, $names;
@@ -145,7 +146,6 @@ elsif ($git_patch_file = read_file(".git_patch") and $git_patch_file !~ /\A\$For
     }
     if (!$branch) {
         ($branch) = map m{^tag: (.*)}, @names;
-        $describe = $branch;
     }
     if (!$branch) {
         my ($pr) = map m{^refs/pull/([0-9]+)/}, @names;
@@ -155,14 +155,12 @@ elsif ($git_patch_file = read_file(".git_patch") and $git_patch_file !~ /\A\$For
         $branch = $names[0] || $commit_id;
     }
 
-    $describe ||= $commit_id;
     $extra_info = "git_commit_date='$commit_date'\n";
     $extra_info .= "git_snapshot_date='$commit_date'\n";
     $commit_title = "Snapshot of:";
 }
 elsif (-d "$srcdir/.git") {
-    # git branch | awk 'BEGIN{ORS=""} /\*/ { print $2 }'
-    ($branch) = map { /\* ([^(]\S*)/ ? $1 : () } backtick("git branch");
+    ($branch) = backtick("git symbolic-ref -q HEAD") =~ m#^refs/heads/(.+)$#;
     $branch //= "";
     my ($remote,$merge);
     if (length $branch) {

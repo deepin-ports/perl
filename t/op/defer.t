@@ -6,7 +6,7 @@ BEGIN {
     set_up_inc('../lib');
 }
 
-plan 30;
+plan 29;
 
 use feature 'defer';
 no warnings 'experimental::defer';
@@ -251,31 +251,15 @@ no warnings 'experimental::defer';
     like($e, qr/^Oopsie \d\n/, 'defer block can throw exception during exception unwind');
 }
 
+# goto
 {
-    my $sub = sub {
-        while(1) {
-            defer { return "retval" }
-            last;
-        }
-        return "wrong";
-    };
+    ok(defined eval 'sub { defer { goto HERE; HERE: 1; } }',
+        'goto forwards within defer {} is permitted') or
+        diag("Failure was $@");
 
-    my $e = defined eval { $sub->(); 1 } ? undef : $@;
-    like($e, qr/^Can't "return" out of a "defer" block /,
-        'Cannot return out of defer block');
-}
-
-{
-    my $sub = sub {
-        while(1) {
-            defer { goto HERE }
-        }
-        HERE:
-    };
-
-    my $e = defined eval { $sub->(); 1 } ? undef : $@;
-    like($e, qr/^Can't "goto" out of a "defer" block /,
-        'Cannot goto out of defer block');
+    ok(defined eval 'sub { defer { HERE: 1; goto HERE; } }',
+        'goto backwards within defer {} is permitted') or
+        diag("Failure was $@");
 }
 
 {
@@ -292,31 +276,6 @@ no warnings 'experimental::defer';
 }
 
 {
-    my $subA = sub {
-        my $subB = sub {};
-        while(1) {
-            defer { goto &$subB }
-        }
-    };
-
-    my $e = defined eval { $subA->(); 1 } ? undef : $@;
-    like($e, qr/^Can't "goto" out of a "defer" block at /,
-        'Cannot goto &SUB out of a "defer" block');
-}
-
-{
-    my $sub = sub {
-        LOOP: while(1) {
-            defer { last LOOP }
-        }
-    };
-
-    my $e = defined eval { $sub->(); 1 } ? undef : $@;
-    like($e, qr/^Can't "last" out of a "defer" block /,
-        'Cannot last out of defer block');
-}
-
-{
     # strictness failures are only checked at optree finalization time. This
     # is a good way to test if that happens.
     my $ok = eval 'defer { use strict; foo }';
@@ -325,4 +284,19 @@ no warnings 'experimental::defer';
     ok(!$ok, 'defer BLOCK finalizes optree');
     like($e, qr/^Bareword "foo" not allowed while "strict subs" in use at /,
         'Error from finalization');
+}
+
+# GH#23604
+{
+    my $ok;
+    {
+        defer {
+            eval { die "Ignore this error\n" };
+            $ok .= "k";
+        }
+
+        $ok .= "o";
+    }
+
+    is($ok, "ok", 'eval{die} inside defer does not stop runloop');
 }

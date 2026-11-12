@@ -523,7 +523,7 @@
 :
 :   U  autodoc.pl will not output a usage example
 :
-:   W  Add a _pDEPTH argument to function prototypes, and an _aDEPTH
+:   W  Add a comma_pDEPTH argument to function prototypes, and a comma_aDEPTH
 :      argument to the function calls. This means that under DEBUGGING
 :      a depth argument is added to the functions, which is used for
 :      example by the regex engine for debugging and trace output.
@@ -1943,7 +1943,7 @@ Apd	|bool	|sv_streq_flags	|NULLOK SV* sv1|NULLOK SV* sv2|const U32 flags
 CpMdb	|void	|sv_taint	|NN SV* sv
 CpdR	|bool	|sv_tainted	|NN SV *const sv
 Apd	|int	|sv_unmagic	|NN SV *const sv|const int type
-Apd	|int	|sv_unmagicext	|NN SV *const sv|const int type|NULLOK MGVTBL *vtbl
+Apd	|int	|sv_unmagicext	|NN SV *const sv|const int type|NULLOK const MGVTBL *vtbl
 ApdMb	|void	|sv_unref	|NN SV* sv
 Apd	|void	|sv_unref_flags	|NN SV *const ref|const U32 flags
 Cpd	|void	|sv_untaint	|NN SV *const sv
@@ -1960,6 +1960,9 @@ Apd	|void	|sv_vcatpvfn_flags|NN SV *const sv|NN const char *const pat|const STRL
 Apd	|void	|sv_vsetpvfn	|NN SV *const sv|NN const char *const pat|const STRLEN patlen \
 				|NULLOK va_list *const args|NULLOK SV **const svargs \
 				|const Size_t sv_count|NULLOK bool *const maybe_tainted
+Adp	|const char *|sv_vstring_get					\
+				|NN SV * const sv			\
+				|NULLOK STRLEN *lenp
 CpR	|NV	|str_to_version	|NN SV *sv
 Ap	|void	|regdump	|NN const regexp* r
 CiTop	|struct regexp *|ReANY	|NN const REGEXP * const re

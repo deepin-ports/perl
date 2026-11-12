@@ -46,7 +46,7 @@ sub testop {
     my ($op, $opname, $code) = @_;
     pass("$op : skipped") and return if $code =~ /^SKIP/;
     pass("$op : skipped") and return if $code =~ m://|~~: && $] < 5.010;
-    my $c = new Safe;
+    my $c = Safe->new;
     $c->deny_only($op);
     $c->reval($code);
     like($@, qr/'\Q$opname\E' trapped by operation mask/, $op);
@@ -453,7 +453,7 @@ dor		$x // $y
 dorassign	$x //= $y
 once		SKIP {use feature 'state'; state $foo = 42;}
 say		SKIP {use feature 'say'; say "foo";}
-smartmatch	no warnings 'experimental::smartmatch'; $x ~~ $y
+smartmatch	no warnings 'deprecated'; $x ~~ $y
 aeach		SKIP each @t
 akeys		SKIP keys @t
 avalues		SKIP values @t

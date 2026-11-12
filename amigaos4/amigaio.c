@@ -249,7 +249,7 @@ PerlIO *Perl_my_popen(pTHX_ const char *cmd, const char *mode)
         }
 
         /* Our new process is running and will close it streams etc
-         * once its done. All we need to is open the pipe via stdio
+         * once it's done. All we need to is open the pipe via stdio
          */
 
         return result;
@@ -631,9 +631,8 @@ static void S_exec_failed(pTHX_ const char *cmd, int fd, int do_report)
 //    PERL_ARGS_ASSERT_EXEC_FAILED;
         if (e)
         {
-                if (ckWARN(WARN_EXEC))
-                        Perl_warner(aTHX_ packWARN(WARN_EXEC),
-                                    "Can't exec \"%s\": %s", cmd, Strerror(e));
+            ck_warner(packWARN(WARN_EXEC),
+                      "Can't exec \"%s\": %s", cmd, Strerror(e));
         }
         if (do_report)
         {

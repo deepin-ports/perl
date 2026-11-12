@@ -1524,6 +1524,26 @@ EOT
 
 #############
 {
+  if (!Data::Dumper::SUPPORTS_CORE_BOOLS) {
+      SKIP_BOTH("Core booleans not supported on older perls");
+      last;
+  }
+  my $want = <<'EOT';
+#$VAR1 = [
+#  !!1,
+#  !!0
+#];
+EOT
+
+  $foo = [ !!1, !!0 ];
+  TEST_BOTH(q(Data::Dumper::DumperX($foo)),
+            'Booleans',
+            $want);
+}
+
+
+#############
+{
   # If XS cannot load, the pure-Perl version cannot deparse vstrings with
   # underscores properly.
   # Says the original comment. However, the story is more complex than that.
@@ -1650,7 +1670,7 @@ EOW
 {
   # [github #18614 - handling of Unicode characters in regexes]
   # [github #18764 - ... without breaking subsequent Latin-1]
-  if ($] lt '5.010') {
+  if ("$]" < 5.010) {
       SKIP_BOTH("Incomplete support for UTF-8 in old perls");
       last;
   }
@@ -1663,11 +1683,11 @@ EOW
 #  '\xb6'
 #];
 EOW
-  if ($] lt '5.010001') {
+  if ("$]" < 5.010001) {
       $want =~ s!qr/!qr/(?-xism:!g;
       $want =~ s!/,!)/,!g;
   }
-  elsif ($] gt '5.014') {
+  elsif ("$]" > 5.014) {
       $want =~ s{/(,?)$}{/u$1}mg;
   }
   my $want_xs = $want;
@@ -1693,7 +1713,7 @@ EOW
 #  qr/ $bs$bs$bs\\/ /
 #];
 EOW
-  if ($] lt '5.010001') {
+  if ("$]" < 5.010001) {
       $want =~ s!qr/!qr/(?-xism:!g;
       $want =~ s! /! )/!g;
   }
@@ -1704,7 +1724,7 @@ EOW
 #############
 {
   # [github #18614, github #18764, perl #58608 corner cases]
-  if ($] lt '5.010') {
+  if ("$]" < 5.010) {
       SKIP_BOTH("Incomplete support for UTF-8 in old perls");
       last;
   }
@@ -1718,11 +1738,11 @@ EOW
 #  '\xB6'
 #];
 EOW
-  if ($] lt '5.010001') {
+  if ("$]" < 5.010001) {
       $want =~ s!qr/!qr/(?-xism:!g;
       $want =~ s!/,!)/,!g;
   }
-  elsif ($] gt '5.014') {
+  elsif ("$]" > 5.014) {
       $want =~ s{/(,?)$}{/u$1}mg;
   }
   my $want_xs = $want;
@@ -1752,10 +1772,10 @@ EOW
 #  '\xB6'
 #];
 EOW
-  if ($] lt '5.014') {
+  if ("$]" < 5.014) {
       $want =~ s{/u,$}{/,}mg;
   }
-  if ($] lt '5.010001') {
+  if ("$]" < 5.010001) {
       $want =~ s!qr/!qr/(?-xism:!g;
       $want =~ s!/,!)/,!g;
   }
